@@ -12,9 +12,5 @@ requirements:
   run:
     - python
 
-test:
-  imports:
-    -
-
 about:
   home:
