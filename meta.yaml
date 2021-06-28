@@ -1,15 +1,13 @@
 package:
   name: torch-trainer
-  version: 0.0
+  version: "0.0"
 
 source:
-  git_rev: 0.0
-  git_url: 
+  git_url: git@github.com:francescocastelli/torch-trainer.git
 
 requirements:
   build:
     - python
-    - setuptools
 
   run:
     - python
