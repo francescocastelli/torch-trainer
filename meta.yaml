@@ -1,0 +1,22 @@
+package:
+  name: torch-trainer
+  version: 0.0
+
+source:
+  git_rev: 0.0
+  git_url: 
+
+requirements:
+  build:
+    - python
+    - setuptools
+
+  run:
+    - python
+
+test:
+  imports:
+    -
+
+about:
+  home:
