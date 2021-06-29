@@ -5,7 +5,7 @@ from torch_trainer.utils import _trainer_helper as helper
 
 class Trainer:
     def __init__(self, model, train_loader, valid_loader, epoch_num, summary_args, 
-                 device=None, tb_logs=False, tb_embeddings=False, save_path=None
+                 device=None, print_stats=True, tb_logs=False, tb_embeddings=False, save_path=None,
                  tb_embeddings_num=None):
         """
         Parameters 
@@ -34,6 +34,7 @@ class Trainer:
         self.device = self._check_device(device)
         self.model._device = self.device
         self.args = summary_args
+        self.print_stats = print_stats
         # tensorboard stuffs
         self.tb_embeddings = tb_embeddings
         self.tb_logs = tb_logs
@@ -50,10 +51,7 @@ class Trainer:
         return device  
 
     def _send_to_device(self, data: dict):
-        for k, d in data.items():
-            data[k] = d.to(self.device)
-
-        return data
+        data.update({k: d.to(self.device) for k, d in data.items()})
 
     def _print_epoch_stats(self, current_epoch, current_i, end=False):
         out_dict = dict()
@@ -99,7 +97,7 @@ class Trainer:
         with torch.no_grad():
             for i, data in enumerate(self.valid_loader):
                 # send to device
-                data = self._send_to_device(data)
+                self._send_to_device(data)
 
                 # inference 
                 embeddings, *metadata = self.model.embeddings_forward(data)
@@ -111,9 +109,10 @@ class Trainer:
                     final_embeddings = torch.vstack((final_embeddings, embeddings))
                     final_meta = torch.vstack((final_meta, metadata))
 
-                if i > int(self.embeddings_num/self.valid_bs): break
+                assert(embeddings.shape[0] == 128)
+                if i > int(self.tb_embeddings_num/embeddings.shape[0]): break
 
-        print("\nSaving {} tensors for projection...".format(i*self.valid_bs)) 
+        print("\nSaving {} tensors for projection...".format(i*embeddings.shape[0]))
         # save the embeddings + the metadata
         for i, meta in enumerate(metadata):
             self.tb_writer.add_embedding(final_embeddings, metadata=meta, global_step=i)
@@ -134,11 +133,11 @@ class Trainer:
             self.model.train()
 
             for i, data in enumerate(self.train_loader):
+                # send to device
+                self._send_to_device(data)
+
                 # zero the parameter gradients
                 self.optimizer.zero_grad()
-
-                # send to device
-                data = self._send_to_device(data)
 
                 # training step 
                 loss = self.model.training_step(data)
@@ -147,14 +146,15 @@ class Trainer:
                 loss.backward()
                 self.optimizer.step()
 
-                self._print_epoch_stats(epoch, i)
+                if self.print_stats:
+                    self._print_epoch_stats(epoch, i)
 
             #compute validation loss and acc at the end of each epoch
             self.model.eval()
             with torch.no_grad():
                 for i, data in enumerate(self.valid_loader):
                     # send to device
-                    data = self._send_to_device(data)
+                    self._send_to_device(data)
 
                     # valid step 
                     loss = self.model.validation_step(data)
