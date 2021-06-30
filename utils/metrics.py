@@ -3,6 +3,16 @@ from sklearn.metrics import roc_auc_score, roc_curve, confusion_matrix, balanced
 from scipy.optimize import brentq
 from scipy.interpolate import interp1d
 
+def positive_negative_num(predictions, labels):
+    conf_vector = predictions.reshape(labels.shape) / labels
+
+    tp = torch.sum(conf_vector == 1)
+    fp = torch.sum(conf_vector == float('inf'))
+    tn = torch.sum(torch.isnan(conf_vector))
+    fn = torch.sum(conf_vector == 0)
+
+    return tp, fp, tn, fn
+
 def triplet_accuracy(distp, distn, margin):
     pred = distn - distp - margin 
     return (pred > 0).sum()*1.0/distp.shape[0]
@@ -12,8 +22,18 @@ def classification_accuracy(predictions, labels):
     return acc
 
 def running_balanced_accuracy(predictions, labels):
-    acc = balanced_accuracy_score(labels.cpu().long(), predictions.cpu().long()) 
-    return acc
+    sens = sensitivity(predictions, labels)
+    spec = specificity(predictions, labels)
+    
+    return (sens + spec) / 2
+
+def sensitivity(predictions, labels):
+    tp, _, _, fn = positive_negative_num(predictions, labels) 
+    return tp / (tp + fn)
+
+def specificity(predictions, labels):
+    _, fp, tn, _ = positive_negative_num(predictions, labels) 
+    return tn / (fp + tn)
 
 def balanced_accuracy(predictions, labels):
     acc = balanced_accuracy_score(labels, predictions) 
