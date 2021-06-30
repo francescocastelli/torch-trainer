@@ -1,5 +1,6 @@
 import torch
 from typing import Callable, Any
+from collections import defaultdict
 
 class Model(torch.nn.Module):
     ''' 
@@ -13,8 +14,6 @@ class Model(torch.nn.Module):
 
     def __init__(self, name):
         super().__init__()
-        self.train_stats = dict()
-        self.valid_stats = dict()
         # will be set by the Trainer
         self._device = None
         self.name = name
@@ -32,27 +31,21 @@ class Model(torch.nn.Module):
         raise NotImplementedError
 
     def save_train_stats(self, **kwargs):
-        for key, value in kwargs.items():
-            if key in self.train_stats:
-                self.train_stats[key] += value
-            else: 
-                self.train_stats[key] = torch.tensor(0.0, device=self._device, 
-                                                       requires_grad=False) 
-                self.train_stats[key] += value
+        self.train_stats.update({k: self.train_stats[k] + d for k, d in kwargs.items()})
 
     def save_valid_stats(self, **kwargs):
-        for key, value in kwargs.items():
-            if key in self.valid_stats:
-                self.valid_stats[key] += value
-            else: 
-                self.valid_stats[key] = torch.tensor(0.0, device=self._device, 
-                                                       requires_grad=False)
-                self.valid_stats[key] += value
+        self.valid_stats.update({k: self.valid_stats[k] + d for k, d in kwargs.items()})
+
+    def init_stats(self):
+        self.train_stats = defaultdict(lambda: torch.tensor(0.0, device=self._device, 
+                                       requires_grad=False))
+        self.valid_stats = defaultdict(lambda: torch.tensor(0.0, device=self._device, 
+                                       requires_grad=False))
 
     def reset_stats(self):
         self.train_stats.clear()
         self.valid_stats.clear()
-
+        
     # should return the value of the loss function
     training_step: Callable[..., Any] = _train_step_unimplemented
     # may return the value of the loss, not important

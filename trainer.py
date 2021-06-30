@@ -32,7 +32,10 @@ class Trainer:
         # other info
         self.epoch_num = epoch_num
         self.device = self._check_device(device)
+        # inizialize stats on the model 
         self.model._device = self.device
+        self.model.init_stats()
+        # args 
         self.args = summary_args
         self.print_stats = print_stats
         # tensorboard stuffs
@@ -109,7 +112,6 @@ class Trainer:
                     final_embeddings = torch.vstack((final_embeddings, embeddings))
                     final_meta = torch.vstack((final_meta, metadata))
 
-                assert(embeddings.shape[0] == 128)
                 if i > int(self.tb_embeddings_num/embeddings.shape[0]): break
 
         print("\nSaving {} tensors for projection...".format(i*embeddings.shape[0]))
