@@ -12,11 +12,12 @@ class Model(torch.nn.Module):
         the save_epoch_stats
     '''
 
-    def __init__(self, name):
+    def __init__(self, name, load_path=None):
         super().__init__()
         # will be set by the Trainer
         self._device = None
         self.name = name
+        self.load_path = load_path
         
     def _train_step_unimplemented(self, *input: Any):
         raise NotImplementedError
@@ -46,6 +47,10 @@ class Model(torch.nn.Module):
         self.train_stats.clear()
         self.valid_stats.clear()
         
+    '''
+        These methods should be overrided by the user model class, otherwise throw 
+        a NotImplemented exception.
+    '''
     # should return the value of the loss function
     training_step: Callable[..., Any] = _train_step_unimplemented
     # may return the value of the loss, not important
