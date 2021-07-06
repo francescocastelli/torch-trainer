@@ -67,28 +67,26 @@ class Trainer:
     def _print_epoch_stats(self, current_epoch, current_i, end=False):
         out_dict = dict()
         for key, value in self.model.train_stats.items():
-            out_dict[key] = value.item() / (current_i+1)
+            out_dict[key] = value.item() / (current_i)
 
         if end: 
             for key, value in self.model.valid_stats.items():
                 out_dict[key] = value.item() / (self.valid_len) 
         
-        helper.print_epoch_stats(current_epoch, current_i+1, self.train_len, 
+        helper.print_epoch_stats(current_epoch, current_i, self.train_len, 
                                 self.scheduler.get_last_lr()[0], end, **out_dict)
 
     def _setup_tensorboard(self):
         self.tb_logdir = helper.create_logs_dir(self.save_path)    
         self.tb_writer = SummaryWriter(log_dir=self.tb_logdir)
 
-    # TODO: check final results values
     def _save_epoch_stats(self, epoch):
         for key, value in self.model.train_stats.items():
-            self.tb_writer.add_scalar('Train/{}'.format(key), value, epoch)
+            self.tb_writer.add_scalar('Train/{}'.format(key), value / self.train_len, epoch)
 
         for key, value in self.model.valid_stats.items():
-            self.tb_writer.add_scalar('Valid/{}'.format(key), value, epoch)
+            self.tb_writer.add_scalar('Valid/{}'.format(key), value / self.valid_len, epoch)
 
-    # TODO: check final results values
     def _save_results(self):
         # save model
         torch.save(self.model.state_dict(), os.path.join(self.tb_logdir, self.model_name + '.pt'))
@@ -96,10 +94,10 @@ class Trainer:
         # this can be useful to compare different runs with different hparams
         hpar_dict = {}
         for key, value in self.model.train_stats.items():
-            hpar_dict['hparam/{}'.format(key)] = value
+            hpar_dict['hparam/{}'.format(key)] = value / self.train_len
 
         for key, value in self.model.valid_stats.items():
-            hpar_dict['hparam/{}'.format(key)] = value
+            hpar_dict['hparam/{}'.format(key)] = value / self.valid_len
 
         self.tb_writer.add_hparams(vars(self.args), hpar_dict)
         self.tb_writer.flush()
@@ -159,7 +157,7 @@ class Trainer:
                 self.optimizer.step()
 
                 if self.print_stats:
-                    self._print_epoch_stats(epoch, i)
+                    self._print_epoch_stats(epoch, i+1)
 
             #compute validation loss and acc at the end of each epoch
             torch.cuda.empty_cache()
@@ -207,6 +205,7 @@ class Trainer:
                 setattr(self.model, k, d)
 
             # train on the current config
+            torch.cuda.empty_cache()
             self._conf_num = i
             self.train()
 
