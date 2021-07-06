@@ -139,7 +139,6 @@ def batch_all_triplet_loss(embeddings, labels, squared, speakers, systems, margi
 
     return triplet_loss, fraction_positive_triplets
 
-#def batch_hard_triplet_loss(embeddings, labels, squared, speakers, systems, margin, args, device='cpu'):
 def batch_hard_triplet_loss(embeddings, labels, squared, speakers, systems, margin, 
                             use_speakers, use_systems):
 

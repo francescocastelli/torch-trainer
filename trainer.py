@@ -1,12 +1,13 @@
 import os 
 import torch
+import copy
 import pandas as pd
 from torch.utils.tensorboard import SummaryWriter
 from torch_trainer.utils import _trainer_helper as helper
 from torch.profiler import profile, record_function, ProfilerActivity, schedule
 
 class Trainer:
-    def __init__(self, model, train_loader, valid_loader, epoch_num, summary_args, 
+    def __init__(self, model, train_loader, valid_loader, epoch_num, summary_args: dict, 
                  device=None, print_stats=True, tb_logs=False, tb_embeddings=False, save_path=None,
                  tb_embeddings_num=None):
         """
@@ -66,8 +67,11 @@ class Trainer:
 
     def _print_epoch_stats(self, current_epoch, current_i, end=False):
         out_dict = dict()
-        for key, value in self.model.train_stats.items():
-            out_dict[key] = value.item() / (current_i)
+
+        out_dict = {k: v.item() / current_i for k, v in self.model.train_stats.items()}
+
+        #for key, value in self.model.train_stats.items():
+        #    out_dict[key] = value.item() / (current_i)
 
         if end: 
             for key, value in self.model.valid_stats.items():
@@ -99,7 +103,7 @@ class Trainer:
         for key, value in self.model.valid_stats.items():
             hpar_dict['hparam/{}'.format(key)] = value / self.valid_len
 
-        self.tb_writer.add_hparams(vars(self.args), hpar_dict)
+        self.tb_writer.add_hparams(self.args, hpar_dict)
         self.tb_writer.flush()
         self.tb_writer.close()
 
@@ -168,7 +172,7 @@ class Trainer:
                     self._send_to_device(data)
 
                     # valid step 
-                    loss = self.model.validation_step(data)
+                    self.model.validation_step(data)
 
             self._print_epoch_stats(epoch, self.train_len, end=True)
 
@@ -193,19 +197,18 @@ class Trainer:
         train_configs = train_config_df.to_dict(orient='records')
 
         # save initial model parameters 
-        self._initial_model_param = self.model.state_dict()
+        self._initial_model_param = copy.deepcopy(self.model.state_dict())
         self._multi_train = True
         self._output_config_path = os.path.splitext(train_config_path)[0] + '_results.csv'
         
         helper.print_overall_summary(self.model, self.device, train_configs) 
         for i, configs in enumerate(train_configs):
             # set model attributes for the current config
-            #self.args.update(configs)
+            self.args.update(configs)
             for k, d in configs.items(): 
                 setattr(self.model, k, d)
 
             # train on the current config
-            torch.cuda.empty_cache()
             self._conf_num = i
             self.train()
 
@@ -214,7 +217,9 @@ class Trainer:
             configs.update({k: d.item()/self.valid_len for k, d in self.model.valid_stats.items()})
 
             # reset the parameters of the model
+            self.model.reset_stats()
             self.model.load_state_dict(self._initial_model_param)
+            torch.cuda.empty_cache()
 
         final_df = pd.DataFrame.from_dict(train_configs, orient='columns')
         final_df.to_csv(self._output_config_path, sep=' ')

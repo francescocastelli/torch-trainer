@@ -38,7 +38,7 @@ def print_summary(model, device, args, multi_train, config_num, eval_loop=False)
 
     out = '\n\n'
     out += '{:#^{}s}\n\n'.format('  Device: {} - {} '.format(device, conf), width)
-    for i, (key, value) in enumerate(vars(args).items()):
+    for i, (key, value) in enumerate(args.items()):
         out += '  {}={}  '.format(key, value) 
         if not (i+1) % 6:
             out += '\n'
