@@ -58,7 +58,7 @@ def print_overall_summary(model, device, train_config):
     out += '{:#^{}s}\n\n'.format('  Train configurations  ',  width)
 
     for i, conf in enumerate(train_config):
-        out += ' Config {}: {}\n'.format(i, conf)
+        out += ' {}: {}\n'.format(i, conf)
 
     print('\r{}\n'.format(out))
 
@@ -77,3 +77,7 @@ def print_epoch_stats(epoch, current_i, data_size, lr, end=False, **kwargs):
     print('\033[{}F{}'.format(2+line_num, out), end='')
     if end: print('\n'*3)
 
+def print_end_train():
+    width = os.get_terminal_size().columns
+    out = '{:#^{}s}\n\n'.format('  Finished training!  ', width)
+    print('\33[32m' + out + '\033[0m')
