@@ -183,8 +183,9 @@ class Trainer:
             if self.tb_logs: 
                 self._save_epoch_stats(epoch)
 
-        print('Finished training!')
-
+        # train end
+        helper.print_end_train() 
+    
         # tensorboard for saving results and embeddings
         if self.tb_logs:
             self._save_results()
@@ -215,6 +216,7 @@ class Trainer:
             # save results
             configs.update({k: d.item()/self.train_len for k, d in self.model.train_stats.items()})
             configs.update({k: d.item()/self.valid_len for k, d in self.model.valid_stats.items()})
+            if self.tb_logs: configs.update({'results_name': self.tb_logdir})
 
             # reset the parameters of the model
             self.model.reset_stats()
