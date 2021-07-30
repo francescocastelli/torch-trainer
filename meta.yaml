@@ -1,6 +1,6 @@
 package:
-  name: torch-trainer
-  version: "0.0"
+  name: torch_trainer
+  version: "1.0"
 
 source:
   git_url: git@github.com:francescocastelli/torch-trainer.git
@@ -13,4 +13,4 @@ requirements:
     - python
 
 about:
-  home:
+  home: git@github.com:francescocastelli/torch-trainer.git
