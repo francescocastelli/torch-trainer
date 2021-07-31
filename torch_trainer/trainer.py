@@ -66,12 +66,7 @@ class Trainer:
         data.update({k: d.to(self.device) for k, d in data.items()})
 
     def _print_epoch_stats(self, current_epoch, current_i, end=False):
-        out_dict = dict()
-
         out_dict = {k: v.item() / current_i for k, v in self.model.train_stats.items()}
-
-        #for key, value in self.model.train_stats.items():
-        #    out_dict[key] = value.item() / (current_i)
 
         if end: 
             for key, value in self.model.valid_stats.items():
