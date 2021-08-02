@@ -53,7 +53,7 @@ class Trainer:
         if tb_embeddings and tb_embeddings_num is None: 
             raise ValueError("tb_embeddings_num should be defined if tb_embeddings is True")
         if self.model.load_path is not None:
-            self.model.load_shared_dict(torch.load(os.path.join(os.getcwd(), self.model.load_path),
+            self.model.load_state_dict(torch.load(os.path.join(os.getcwd(), self.model.load_path),
                                                    map_location=device))
 
     def _check_device(self, device):
