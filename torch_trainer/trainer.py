@@ -56,7 +56,6 @@ class Trainer:
             self.model.load_shared_dict(torch.load(os.path.join(os.getcwd(), self.model.load_path),
                                                    map_location=device))
 
-
     def _check_device(self, device):
         if device is None:
             return torch.device('cuda:'+str(helper.get_free_gpu()) if torch.cuda.is_available() else 'cpu')
@@ -68,10 +67,8 @@ class Trainer:
     def _print_epoch_stats(self, current_epoch, current_i, end=False):
         out_dict = {k: v.item() / current_i for k, v in self.model.train_stats.items()}
 
-        if end: 
-            for key, value in self.model.valid_stats.items():
-                out_dict[key] = value.item() / (self.valid_len) 
-        
+        if end: out_dict = {k: v.item() / (self.valid_len) for k, v in self.model.valid_stats.items()}
+
         helper.print_epoch_stats(current_epoch, current_i, self.train_len, 
                                 self.scheduler.get_last_lr()[0], end, **out_dict)
 
