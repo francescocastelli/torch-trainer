@@ -3,7 +3,7 @@ package:
   version: "1.0"
 
 source:
-  git_url: git@github.com:francescocastelli/torch-trainer.git
+  path: ..
 
 requirements:
   build:

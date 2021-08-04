@@ -1,0 +1,17 @@
+{
+  "paths": [
+    {
+      "_path": "lib/python3.8/site-packages/torch_trainer-1.0-py3.8.egg",
+      "path_type": "hardlink",
+      "sha256": "d01ea9b79cc367f75887a3ee22a864821e0b91da74019fa5bdeff7eb11b9901b",
+      "size_in_bytes": 19532
+    },
+    {
+      "_path": "lib/python3.8/site-packages/torch_trainer.pth",
+      "path_type": "hardlink",
+      "sha256": "eafaaf266024b8d1e4ed090f3477cfdab8f4f208f7a461b883faf41409d5b6d8",
+      "size_in_bytes": 30
+    }
+  ],
+  "paths_version": 1
+}
