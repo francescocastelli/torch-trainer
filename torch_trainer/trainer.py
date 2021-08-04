@@ -67,7 +67,9 @@ class Trainer:
     def _print_epoch_stats(self, current_epoch, current_i, end=False):
         out_dict = {k: v.item() / current_i for k, v in self.model.train_stats.items()}
 
-        if end: out_dict = {k: v.item() / (self.valid_len) for k, v in self.model.valid_stats.items()}
+        if end: 
+            for k, v in self.model.valid_stats.items():
+                out_dict[k] = v.item() / (self.valid_len)
 
         helper.print_epoch_stats(current_epoch, current_i, self.train_len, 
                                 self.scheduler.get_last_lr()[0], end, **out_dict)
