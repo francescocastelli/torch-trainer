@@ -90,12 +90,9 @@ class Trainer:
         torch.save(self.model.state_dict(), os.path.join(self.tb_logdir, self.model_name + '.pt'))
         # write hparameters to tensorboard
         # this can be useful to compare different runs with different hparams
-        hpar_dict = {}
-        for key, value in self.model.train_stats.items():
-            hpar_dict['hparam/{}'.format(key)] = value / self.train_len
-
-        for key, value in self.model.valid_stats.items():
-            hpar_dict['hparam/{}'.format(key)] = value / self.valid_len
+        # TODO: check this
+        hpar_dict = {'hparam/{}'.format(k): v / self.train_len for k, v in self.model.train_stats.items()}
+        hpar_dict.update({'hparam/{}'.format(k): v / self.valid_len for k, v in self.model.valid_stats.items()})
 
         self.tb_writer.add_hparams(self.args, hpar_dict)
         self.tb_writer.flush()
