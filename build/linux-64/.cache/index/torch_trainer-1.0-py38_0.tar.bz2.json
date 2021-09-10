@@ -1,1 +1,0 @@
-{"build": "py38_0", "build_number": 0, "depends": ["python >=3.8,<3.9.0a0"], "name": "torch_trainer", "subdir": "linux-64", "timestamp": 1628107872654, "version": "1.0", "size": 21787, "md5": "797458fe7d0ed4188aabecfcbc57d513", "sha256": "be65eb0516586645dad02e71e9bfba9c2ebf60106804af8dbb2766f55b289f7a"}
