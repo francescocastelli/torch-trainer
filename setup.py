@@ -1,7 +1,8 @@
-import setuptools
+from setuptools import setup, find_packages
 
-setuptools.setup(name='torch_trainer',
-                 version='1.0',
-                 package_dir={"": "src"},
-                 packages=setuptools.find_packages(where="src"),
-                 )
+setup(name='torchtrainer',
+      version='1.1',
+      packages=find_packages(),
+      include_package_data=True,
+      test_suite="tests"
+      )

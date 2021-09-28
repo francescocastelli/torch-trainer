@@ -6,9 +6,13 @@ from scipy.interpolate import interp1d
 def positive_negative_num(predictions, labels):
     conf_vector = predictions.reshape(labels.shape) / labels
 
+    # model 1 - label 1
     tp = torch.sum(conf_vector == 1)
-    fp = torch.sum(conf_vector == float('inf'))
+    # model 1 - label 0
+    fp = torch.sum(torch.isinf(conf_vector)) 
+    # model 0 - label 0
     tn = torch.sum(torch.isnan(conf_vector))
+    # model 0 - label 1
     fn = torch.sum(conf_vector == 0)
 
     return tp, fp, tn, fn
@@ -21,18 +25,39 @@ def classification_accuracy(predictions, labels):
     acc = torch.sum((predictions.reshape(-1).long() == labels.long())) / (labels.size(0))
     return acc
 
+'''
+Accuracy for the case of unbalanced dataset
+'''
 def running_balanced_accuracy(predictions, labels):
     sens = sensitivity(predictions, labels)
     spec = specificity(predictions, labels)
     
     return (sens + spec) / 2
 
+'''
+True positive rate, tp / (tp + fn)
+The percentage of model predictions of class 1 that are correct
+'''
 def sensitivity(predictions, labels):
     tp, _, _, fn = positive_negative_num(predictions, labels) 
+
+    # handle the case of no positive example in the labels
+    if tp + fn == 0:
+        return torch.tensor(0.0)
+
     return tp / (tp + fn)
 
+'''
+True negative rate, tn / (fp + tn)
+The percentage of model predictions of class 0 that are correct
+'''
 def specificity(predictions, labels):
     _, fp, tn, _ = positive_negative_num(predictions, labels) 
+
+    # handle the case of no negative example in the labels
+    if fp + tn == 0:
+        return torch.tensor(0.0)
+
     return tn / (fp + tn)
 
 # sklearn metrics

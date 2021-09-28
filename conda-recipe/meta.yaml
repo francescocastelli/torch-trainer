@@ -1,12 +1,19 @@
 package:
-  name: torch_trainer
-  version: "1.0"
+  name: torchtrainer
+  version: "1.1"
 
 source:
-  path: ..
+  path: ../
+
+build:
+  number: 1
+
+test:
+  requires:
+    - python
 
 requirements:
-  build:
+  host:
     - python
 
   run:
