@@ -31,6 +31,24 @@ class BalancedAccTestCase(unittest.TestCase):
         tnr = specificity(predictions, labels) 
         self.assertEqual(tnr.item(), 1.0)
 
+    # should produce 1.0
+    def test_balanced_accuracy_no_ones(self):
+        predictions = torch.tensor([0, 0, 0, 0, 0, 0])
+        labels = torch.tensor([0, 0, 0, 0, 0, 0])
+
+        sk_acc = balanced_accuracy_score(labels, predictions)
+        acc = running_balanced_accuracy(predictions, labels)
+        self.assertAlmostEqual(sk_acc, acc.item(), delta=0.01)
+
+    # should produce 0.0
+    def test_balanced_accuracy_no_zeros(self):
+        predictions = torch.tensor([1, 1, 1, 1, 1, 1])
+        labels = torch.tensor([1, 1, 1, 1, 1, 1])
+
+        sk_acc = balanced_accuracy_score(labels, predictions)
+        acc = running_balanced_accuracy(predictions, labels)
+        self.assertAlmostEqual(sk_acc, acc.item(), delta=0.01)
+
     def test_balanced_accuracy_score(self):
         predictions = torch.tensor([0, 1, 0, 0, 1, 0])
         labels = torch.tensor([0, 1, 0, 0, 0, 1])
