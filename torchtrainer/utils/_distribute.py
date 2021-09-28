@@ -26,3 +26,22 @@ def spawn_processes(train_fn, world_size):
              args=(world_size,),
              nprocs=world_size,
              join=True)
+
+class DDP(DistributedDataParallel):
+    def init_stats(self):
+        self.module.init_stats()
+
+    def reset_stats(self):
+        self.module.reset_stats()
+
+    def training_step(self, data):
+        return self.module.training_step(data)
+
+    def validation_step(self, data):
+        return self.module.validation_step(data)
+
+    def embeddings_forward(self, x):
+        return self.module.embeddings_forward(x)
+
+    def define_optimizer_scheduler(self):
+        return self.module.define_optimizer_scheduler()

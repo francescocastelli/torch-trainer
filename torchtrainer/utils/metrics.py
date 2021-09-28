@@ -7,13 +7,13 @@ def positive_negative_num(predictions, labels):
     conf_vector = predictions.reshape(labels.shape) / labels
 
     # model 1 - label 1
-    tp = torch.sum(conf_vector == 1)
+    tp = torch.sum(conf_vector == 1, dim=-1)
     # model 1 - label 0
-    fp = torch.sum(torch.isinf(conf_vector)) 
+    fp = torch.sum(torch.isinf(conf_vector), dim=-1) 
     # model 0 - label 0
-    tn = torch.sum(torch.isnan(conf_vector))
+    tn = torch.sum(torch.isnan(conf_vector), dim=-1)
     # model 0 - label 1
-    fn = torch.sum(conf_vector == 0)
+    fn = torch.sum(conf_vector == 0, dim=-1)
 
     return tp, fp, tn, fn
 
@@ -27,12 +27,17 @@ def classification_accuracy(predictions, labels):
 
 '''
 Accuracy for the case of unbalanced dataset
+Assumed that the batch size is the first dimension
+Return the balanced accuracy averaged over the batch dimension
 '''
 def running_balanced_accuracy(predictions, labels):
     sens = sensitivity(predictions, labels)
     spec = specificity(predictions, labels)
     
-    return (sens + spec) / 2
+    balanced_acc = (sens + spec) / 2
+    # compute the mean over the batch
+    mean_balaced_acc = balanced_acc.mean()
+    return mean_balaced_acc
 
 '''
 True positive rate, tp / (tp + fn)
@@ -41,11 +46,11 @@ The percentage of model predictions of class 1 that are correct
 def sensitivity(predictions, labels):
     tp, _, _, fn = positive_negative_num(predictions, labels) 
 
+    sens = tp / (tp + fn)
     # handle the case of no positive example in the labels
-    if tp + fn == 0:
-        return torch.tensor(0.0)
+    sens[torch.isnan(sens)] = 0.0
 
-    return tp / (tp + fn)
+    return sens
 
 '''
 True negative rate, tn / (fp + tn)
@@ -54,11 +59,11 @@ The percentage of model predictions of class 0 that are correct
 def specificity(predictions, labels):
     _, fp, tn, _ = positive_negative_num(predictions, labels) 
 
+    spec = tn / (fp + tn)
     # handle the case of no negative example in the labels
-    if fp + tn == 0:
-        return torch.tensor(0.0)
+    spec[torch.isnan(spec)] = 0.0
 
-    return tn / (fp + tn)
+    return spec 
 
 # sklearn metrics
 def balanced_accuracy(predictions, labels):

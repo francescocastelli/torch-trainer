@@ -51,7 +51,7 @@ def print_summary(model, device, gpu_num, args, multi_train, config_num, eval_lo
     if not eval_loop:
         print('{:#^{}s}{}'.format('  Training loop  ', width, '\n'*4))
 
-def print_overall_summary(model, device, train_config):
+def print_overall_summary(model, train_config):
     width = os.get_terminal_size().columns
 
     # model 

@@ -139,11 +139,11 @@ def batch_all_triplet_loss(embeddings, labels, squared, speakers, systems, margi
 
     return triplet_loss, fraction_positive_triplets
 
-def batch_hard_triplet_loss(embeddings, labels, squared, speakers, systems, margin, 
+def batch_hard_triplet_loss(embeddings, labels, squareRoot, speakers, systems, margin, 
                             use_speakers, use_systems):
 
     # Get the pairwise distance matrix
-    pairwise_dist = _get_distance_matrix(embeddings, squared)
+    pairwise_dist = _get_distance_matrix(embeddings, squareRoot=squareRoot)
 
     # For each anchor, get the hardest positive
     # First, we need to get a mask for every valid positive (they should have same label)
