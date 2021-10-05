@@ -26,7 +26,7 @@ def _print_model(model):
     print(out_m)
     print(model)
 
-def print_summary(model, device, gpu_num, args, multi_train, config_num, eval_loop=False):
+def print_summary(model, device, distributed, args, multi_train, config_num, eval_loop=False):
     width = os.get_terminal_size().columns
 
     # model 
@@ -37,7 +37,7 @@ def print_summary(model, device, gpu_num, args, multi_train, config_num, eval_lo
     conf = 'Configuration num: {}'.format(config_num)
 
     out = '\n\n'
-    if gpu_num < 2:
+    if not distributed:
         out += '{:#^{}s}\n\n'.format('  Device: {} - {} '.format(device, conf), width)
     else:
         out += '{:#^{}s}\n\n'.format('  Train on multi GPU - {} '.format(conf), width)

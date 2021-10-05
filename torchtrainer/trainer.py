@@ -11,7 +11,7 @@ import torchtrainer.utils._distribute as dist
 
 class Trainer:
     def __init__(self, model: Model, train_dataset: torch.utils.data.Dataset, valid_dataset: torch.utils.data.Dataset, 
-                 epoch_num: int, batch_size: int, shuffle: bool, num_workers: int, summary_args: dict, 
+                 epoch_num: int, batch_size: int, shuffle: bool, num_workers: int, summary_args: dict, seed=0,
                  device=None, collate_fn=None, worker_init=None, distributed=False, print_stats=True, tb_logs=False, tb_embeddings=False, save_path=None,
                  tb_embeddings_num=None):
         """
@@ -72,8 +72,11 @@ class Trainer:
                                                    map_location=device))
 
         # set seeds
-        torch.manual_seed(0)
-        random.seed(0)
+        torch.manual_seed(seed)
+        random.seed(seed)
+
+
+    ## -- utils --
 
     def _check_device(self, device):
         if device is None:
@@ -82,6 +85,22 @@ class Trainer:
 
     def _send_to_device(self, data: dict, device):
         data.update({k: d.to(device) for k, d in data.items()})
+
+    def _worker_init_fn(self, w_id):
+        worker_seed = torch.initial_seed() % 2**32
+        random.seed(worker_seed)
+        
+        if self.worker_init is not None: 
+            self.worker_init()
+
+    ##  -- stats --
+
+    def _save_epoch_stats(self, epoch, train_len, valid_len, train_stats, valid_stats):
+        for key, value in train_stats.items():
+            self.tb_writer.add_scalar('Train/{}'.format(key), value / train_len, epoch)
+
+        for key, value in valid_stats.items():
+            self.tb_writer.add_scalar('Valid/{}'.format(key), value / valid_len, epoch)
 
     def _print_epoch_stats(self, train_stats, current_epoch, i, train_len, num_train_batches, valid_len, last_lr, end=False, valid_stats=None):
         out_dict = {k: v.item() / train_len for k, v in train_stats.items()}
@@ -92,23 +111,21 @@ class Trainer:
         helper.print_epoch_stats(current_epoch, i, num_train_batches, last_lr, 
                                  end, **out_dict)
 
-    def _setup_tensorboard(self):
+    ## -- tensorboard stuffs --
+
+    def _tb_setup_tensorboard(self):
         self.tb_logdir = helper.create_logs_dir(self.save_path)    
         self.tb_writer = SummaryWriter(log_dir=self.tb_logdir)
 
-    def _save_epoch_stats(self, epoch, train_len, valid_len, train_stats, valid_stats):
-        for key, value in train_stats.items():
-            self.tb_writer.add_scalar('Train/{}'.format(key), value / train_len, epoch)
+    def _tb_save_graph(self, model, input_shape):
+        self.tb_writer.add_graph(model, torch.rand(input_shape))
+        self.tb_writer.flush()
 
-        for key, value in valid_stats.items():
-            self.tb_writer.add_scalar('Valid/{}'.format(key), value / valid_len, epoch)
-
-    def _save_results(self, train_len, valid_len, model):
+    def _tb_save_results(self, train_len, valid_len, model):
         # save model
         torch.save(model.state_dict(), os.path.join(self.tb_logdir, self.model_name + '.pt'))
         # write hparameters to tensorboard
         # this can be useful to compare different runs with different hparams
-        # TODO: check this
         hpar_dict = {'hparam/{}'.format(k): v / train_len for k, v in model.train_stats.items()}
         hpar_dict.update({'hparam/{}'.format(k): v / valid_len for k, v in model.valid_stats.items()})
 
@@ -116,14 +133,7 @@ class Trainer:
         self.tb_writer.flush()
         self.tb_writer.close()
 
-    def _seed_workers(self, w_id):
-        worker_seed = torch.initial_seed() % 2**32
-        random.seed(worker_seed)
-        
-        if self.worker_init is not None: 
-            self.worker_init()
-
-    def _save_embeddings(self, model, device, valid_loader):
+    def _tb_save_embeddings(self, model, device, valid_loader):
         model.eval()
         with torch.no_grad():
             for i, data in enumerate(valid_loader):
@@ -147,18 +157,24 @@ class Trainer:
         for i, meta in enumerate(final_meta):
             self.tb_writer.add_embedding(final_embeddings, metadata=meta, global_step=i)
 
+
+    ## -- train --
+
     def train(self):
         if self._distributed:
-            helper.print_summary(self.model, None, self.gpu_num, self.args, self._multi_train, self._conf_num) 
+            helper.print_summary(self.model, None, self._distributed, self.args, self._multi_train, self._conf_num) 
             dist.spawn_processes(self._train_loop, self.gpu_num)
         else:
             device = self._check_device(self.device)
-            helper.print_summary(self.model, device, self.gpu_num, self.args, self._multi_train, self._conf_num) 
+            helper.print_summary(self.model, device, self._distributed, self.args, self._multi_train, self._conf_num) 
             self._train_loop(device, 0)
 
     # gpu argument can either be a device or the index of the device
     # in the case of distributed training
     def _train_loop(self, gpu, world_size):
+        g = torch.Generator()
+        g.manual_seed(0)
+
         device = torch.device(gpu)
         
         # we need to use a deep copy of the model on each subprocess in case of distributed training
@@ -176,6 +192,8 @@ class Trainer:
         master = ((not self._distributed) or device.index == 0)
 
         optimizer, scheduler = model.define_optimizer_scheduler()
+
+        # use default sampler
         train_sampler = None
         valid_sampler = None
 
@@ -197,28 +215,38 @@ class Trainer:
                                 num_replicas=world_size,
                                 rank=gpu, 
                                 shuffle=False)
-            
-        g = torch.Generator()
-        g.manual_seed(0)
+        elif self.shuffle: 
+            # create the random sampler
+            train_sampler = torch.utils.data.RandomSampler(self.train_dataset, 
+                                                           replacement=False, 
+                                                           generator=g)
+
+            valid_sampler = torch.utils.data.RandomSampler(self.valid_dataset, 
+                                                           replacement=False, 
+                                                           generator=g)
+                                                        
 
         # if the device is a gpu we pin the memory on the dataloader for faster transfer of data
         pin_mem = (device.type == 'cuda')
 
         train_loader = torch.utils.data.DataLoader(self.train_dataset, batch_size=self.bs, sampler=train_sampler, 
                                                    num_workers=self.workes, collate_fn=self.collate_fn, pin_memory=pin_mem, 
-                                                   worker_init_fn=self._seed_workers, generator=g)
+                                                   worker_init_fn=self._worker_init_fn, generator=g)
 
         valid_loader = torch.utils.data.DataLoader(self.valid_dataset, batch_size=self.bs, sampler=valid_sampler, 
                                                    num_workers=self.workes, collate_fn=self.collate_fn, pin_memory=pin_mem, 
-                                                   worker_init_fn=self._seed_workers, generator=g)
+                                                   worker_init_fn=self._worker_init_fn, generator=g)
 
         # num of train batches
         train_batch_num = len(train_loader) - 1
         # num of samples in the train dataset
         valid_len = len(valid_loader.dataset)
 
-        if self.tb_logs:
-            self._setup_tensorboard()
+        if self.tb_logs and master:
+            self._tb_setup_tensorboard()
+            # get the input shape and save the model graph
+            input_sample = next(it(train_loader))
+            self._tb_save_grap(model, input_sample.shape)
 
         # training loop
         for epoch in range(self.epoch_num): 
@@ -275,10 +303,13 @@ class Trainer:
     
         # tensorboard for saving results and embeddings
         if master and self.tb_logs:
-            self._save_results(model=model, train_len=len(train_loader.dataset), valid_len=len(valid_loader.dataset))
+            self._tb_save_results(model=model, train_len=len(train_loader.dataset), valid_len=len(valid_loader.dataset))
 
         if master and self.tb_embeddings:
-            self._save_embeddings(model, device, valid_loader)
+            self._tb_save_embeddings(model, device, valid_loader)
+
+
+    ## -- multi train --
 
     def multi_train(self, train_config_path):
         train_config_df = pd.read_csv(train_config_path, sep=' ')
