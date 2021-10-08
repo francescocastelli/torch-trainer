@@ -3,11 +3,14 @@ import torch
 import copy
 import random 
 import pandas as pd
+import json
 from torchtrainer.model import Model
 from torch.utils.tensorboard import SummaryWriter
 from torchtrainer.utils import _trainer_helper as helper
-from torch.profiler import profile, record_function, ProfilerActivity, schedule
 import torchtrainer.utils._distribute as dist
+
+# TODO: add profiling
+#from torch.profiler import profile, record_function, ProfilerActivity, schedule
 
 class Trainer:
     def __init__(self, model: Model, train_dataset: torch.utils.data.Dataset, valid_dataset: torch.utils.data.Dataset, 
@@ -114,7 +117,7 @@ class Trainer:
     ## -- tensorboard stuffs --
 
     def _tb_setup_tensorboard(self):
-        self.tb_logdir = helper.create_logs_dir(self.save_path)    
+        self.tb_logdir = helper.create_logs_dir(self.save_path, self.model_name)    
         self.tb_writer = SummaryWriter(log_dir=self.tb_logdir)
 
     def _tb_save_graph(self, model, input_shape):
@@ -244,9 +247,9 @@ class Trainer:
 
         if self.tb_logs and master:
             self._tb_setup_tensorboard()
-            # get the input shape and save the model graph
-            input_sample = next(it(train_loader))
-            self._tb_save_grap(model, input_sample.shape)
+            # TODO: get the input shape and save the model graph
+            #input_sample = next(iter(train_loader))
+            #self._tb_save_graph(model, input_sample.shape)
 
         # training loop
         for epoch in range(self.epoch_num): 
@@ -312,8 +315,11 @@ class Trainer:
     ## -- multi train --
 
     def multi_train(self, train_config_path):
-        train_config_df = pd.read_csv(train_config_path, sep=' ')
-        train_configs = train_config_df.to_dict(orient='records')
+        with open(train_config_path) as f:
+            train_configs = json.load(f)
+
+        #train_config_df = pd.read_csv(train_config_path, sep=' ')
+        #train_configs = train_config_df.to_dict(orient='records')
 
         # save initial model parameters 
         self._initial_model_param = copy.deepcopy(self.model.state_dict())

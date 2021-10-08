@@ -8,9 +8,9 @@ def get_free_gpu():
     memory_available = [int(x.split()[2]) for x in res]
     return np.argmax(memory_available)
 
-def create_logs_dir(dir_path):
+def create_logs_dir(dir_path, model_name):
     dir_name = datetime.now().strftime('%d-%m-%y_%H:%M:%S')
-    dir_path = os.path.join(dir_path, dir_name)
+    dir_path = os.path.join(dir_path, model_name, dir_name)
 
     #create the directory 
     if not os.path.exists(dir_path):
