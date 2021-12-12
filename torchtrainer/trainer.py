@@ -7,16 +7,18 @@ import json
 from torchtrainer.model import Model
 from torch.utils.tensorboard import SummaryWriter
 from torchtrainer.utils import _trainer_helper as helper
+from torchtrainer.dataloader import TrainerLoader
 import torchtrainer.utils._distribute as dist
 
 # TODO: add profiling
 #from torch.profiler import profile, record_function, ProfilerActivity, schedule
 
 class Trainer:
-    def __init__(self, model: Model, train_dataset: torch.utils.data.Dataset, valid_dataset: torch.utils.data.Dataset, 
-                 epoch_num: int, batch_size: int, shuffle: bool, num_workers: int, summary_args: dict, seed=0,
-                 device=None, collate_fn=None, worker_init=None, distributed=False, print_stats=True, tb_logs=False, tb_embeddings=False, save_path=None,
-                 tb_embeddings_num=None):
+    def __init__(self, model: Model, train_dataset: torch.utils.data.Dataset, 
+                 valid_dataset: torch.utils.data.Dataset, loader: TrainerLoader,
+                 epoch_num: int, summary_args: dict, seed=0, device=None, 
+                 distributed=False, print_stats=True, save_path=None, tb_logs=False, 
+                 tb_embeddings=False, tb_embeddings_num=None):
         """
         Parameters 
         __________
@@ -35,11 +37,7 @@ class Trainer:
         # data info
         self.train_dataset = train_dataset 
         self.valid_dataset = valid_dataset
-        self.bs = batch_size 
-        self.shuffle = shuffle
-        self.workes = num_workers
-        self.collate_fn = collate_fn
-        self.worker_init = worker_init
+        self.dataloader = loader
         # train info
         self.epoch_num = epoch_num
         self._multi_train = False
@@ -61,6 +59,9 @@ class Trainer:
 
         if distributed and self.gpu_num < 2: 
             raise ValueError(f"cannot use distributed training, only {self.gpu_num} gpu are present")
+
+        if distributed and self.dataloader.sampler is not None:
+            raise ValueError(f"Cannot use custom sampler with distributed training")
 
         # set true only if distributed is enable and device is not set to any particular one
         # at this point we are also sure to have at least 2 gpus for training
@@ -88,13 +89,6 @@ class Trainer:
 
     def _send_to_device(self, data: dict, device):
         data.update({k: d.to(device) for k, d in data.items()})
-
-    def _worker_init_fn(self, w_id):
-        worker_seed = torch.initial_seed() % 2**32
-        random.seed(worker_seed)
-        
-        if self.worker_init is not None: 
-            self.worker_init()
 
     ##  -- stats --
 
@@ -175,9 +169,6 @@ class Trainer:
     # gpu argument can either be a device or the index of the device
     # in the case of distributed training
     def _train_loop(self, gpu, world_size):
-        g = torch.Generator()
-        g.manual_seed(0)
-
         device = torch.device(gpu)
         
         # we need to use a deep copy of the model on each subprocess in case of distributed training
@@ -196,49 +187,21 @@ class Trainer:
 
         optimizer, scheduler = model.define_optimizer_scheduler()
 
-        # use default sampler
-        train_sampler = None
-        valid_sampler = None
-
         if self._distributed:
             # setup of each process
             dist.setup(rank=gpu, world_size=world_size)
-
             model = dist.DDP(model, device_ids=[gpu])
 
-            # set up distributed sampler
-            train_sampler = torch.utils.data.distributed.DistributedSampler(
-                                self.train_dataset,
-                                num_replicas=world_size,
-                                rank=gpu, 
-                                shuffle=self.shuffle)
+            train_loader, train_sampler = self.dataloader._get_distributed_loader(self.train_dataset, 
+                                                                   world_size, gpu, 
+                                                                   device)
+            valid_loader, valid_sampler = self.dataloader._get_distributed_loader(self.valid_dataset, 
+                                                                   world_size, gpu,
+                                                                   device)
 
-            valid_sampler = torch.utils.data.distributed.DistributedSampler(
-                                self.valid_dataset,
-                                num_replicas=world_size,
-                                rank=gpu, 
-                                shuffle=False)
-        elif self.shuffle: 
-            # create the random sampler
-            train_sampler = torch.utils.data.RandomSampler(self.train_dataset, 
-                                                           replacement=False, 
-                                                           generator=g)
-
-            valid_sampler = torch.utils.data.RandomSampler(self.valid_dataset, 
-                                                           replacement=False, 
-                                                           generator=g)
-                                                        
-
-        # if the device is a gpu we pin the memory on the dataloader for faster transfer of data
-        pin_mem = (device.type == 'cuda')
-
-        train_loader = torch.utils.data.DataLoader(self.train_dataset, batch_size=self.bs, sampler=train_sampler, 
-                                                   num_workers=self.workes, collate_fn=self.collate_fn, pin_memory=pin_mem, 
-                                                   worker_init_fn=self._worker_init_fn, generator=g)
-
-        valid_loader = torch.utils.data.DataLoader(self.valid_dataset, batch_size=self.bs, sampler=valid_sampler, 
-                                                   num_workers=self.workes, collate_fn=self.collate_fn, pin_memory=pin_mem, 
-                                                   worker_init_fn=self._worker_init_fn, generator=g)
+        else: 
+            train_loader = self.dataloader._get_loader(self.train_dataset, device)
+            valid_loader = self.dataloader._get_loader(self.valid_dataset, device)
 
         # num of train batches
         train_batch_num = len(train_loader) - 1
@@ -259,6 +222,7 @@ class Trainer:
             # see https://pytorch.org/docs/stable/data.html#torch.utils.data.DataLoader
             if self._distributed:
                 train_sampler.set_epoch(epoch)
+                valid_sampler.set_epoch(epoch)
 
             for i, data in enumerate(train_loader):
                 # send to device
@@ -276,7 +240,7 @@ class Trainer:
 
                 # (print_stats && (!distributed or device == gpu:0))
                 if self.print_stats and master:
-                    self._print_epoch_stats(model.train_stats, epoch, i, (i+1) * self.bs, train_batch_num, valid_len, scheduler.get_last_lr()[0])
+                    self._print_epoch_stats(model.train_stats, epoch, i, (i+1) * self.dataloader.bs, train_batch_num, valid_len, scheduler.get_last_lr()[0])
 
             # compute validation loss and acc at the end of each epoch
             torch.cuda.empty_cache()
