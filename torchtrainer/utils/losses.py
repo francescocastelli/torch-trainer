@@ -140,7 +140,7 @@ def batch_all_triplet_loss(embeddings, labels, squared, speakers, systems, margi
     return triplet_loss, fraction_positive_triplets
 
 def batch_hard_triplet_loss(embeddings, labels, squareRoot, speakers, systems, margin, 
-                            use_speakers, use_systems):
+                            use_speakers_pos, use_speakers_neg, use_systems):
 
     # Get the pairwise distance matrix
     pairwise_dist = _get_distance_matrix(embeddings, squareRoot=squareRoot)
@@ -148,7 +148,7 @@ def batch_hard_triplet_loss(embeddings, labels, squareRoot, speakers, systems, m
     # For each anchor, get the hardest positive
     # First, we need to get a mask for every valid positive (they should have same label)
     mask_anchor_positive = _get_positives_mask(labels, speakers, systems, 
-                                               use_speakers, use_systems)
+                                               use_speakers_pos, use_systems)
     mask_anchor_positive = mask_anchor_positive.float()
 
     # We put to 0 any element where (a, p) is not valid (valid if a != p and label(a) == label(p))
@@ -159,7 +159,7 @@ def batch_hard_triplet_loss(embeddings, labels, squareRoot, speakers, systems, m
 
     # For each anchor, get the hardest negative
     # First, we need to get a mask for every valid negative (they should have different labels)
-    mask_anchor_negative = _get_negatives_mask(labels, speakers, use_speakers)
+    mask_anchor_negative = _get_negatives_mask(labels, speakers, use_speakers_neg)
     mask_anchor_negative = mask_anchor_negative.float()
 
     # We add the maximum value in each row to the invalid negatives (label(a) == label(n))
