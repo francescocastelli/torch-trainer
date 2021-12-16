@@ -71,13 +71,14 @@ def print_epoch_stats(epoch, current_i, data_size, lr, end=False, **kwargs):
     out += '{} lr={:3e}\n'.format(10*' ', lr)
     out += '{} {}/{}'.format(10*' ', current_i, data_size)
     line_num = 0
+    mod_num = 3 if not len(kwargs) % 3 else 2
 
     for i, (key, value) in enumerate(kwargs.items()):
         out += ' - {}={:.4f}'.format(key, value) 
-        if not (i+1) % 3: 
+        if not (i+1) % mod_num: 
             out += '\n{}'.format(18*' ')
             line_num +=1
-    
+
     print('\033[{}F{}'.format(2+line_num, out), end='')
     if end: print('\n'*3)
 
