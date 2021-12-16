@@ -2,6 +2,7 @@ import unittest
 import torch
 from torchtrainer.model import Model
 from torchtrainer.trainer import Trainer
+from torchtrainer.dataloader import TrainerLoader
 import torchvision
 import torchvision.transforms as transforms
 import torch.optim as optim
@@ -36,7 +37,7 @@ class Net(Model):
         outputs = self(inputs)
         loss = self.criterion(outputs, labels)
 
-        self.save_train_stats(train_loss=loss.item()*inputs.shape[0])
+        self.save_train_stats(train_loss=loss.item()*inputs.shape[0], test=0.0)
 
         return loss
 
@@ -48,7 +49,7 @@ class Net(Model):
         outputs = self(inputs)
         loss = self.criterion(outputs, labels)
 
-        self.save_valid_stats(valid_loss=loss.item()*inputs.shape[0])
+        self.save_valid_stats(valid_loss=loss.item()*inputs.shape[0], v_test=0.0)
 
         return loss
 
@@ -107,11 +108,12 @@ class ModelSetUpTestCase(unittest.TestCase):
 
     def test_train_trainer(self):
         args = {}
+        loader = TrainerLoader(batch_size=self.bs, num_workers=0, shuffle=False)
+
         trainer = Trainer(model=self.model, train_dataset=self.train_dataset, 
                           valid_dataset=self.valid_dataset, summary_args=args,
-                          epoch_num=self.epochs, batch_size=self.bs, num_workers=0,
-                          distributed=False, print_stats=True, tb_logs=False, 
-                          shuffle=False)
+                          epoch_num=self.epochs, loader=loader, 
+                          distributed=False, print_stats=True, tb_logs=False)
 
         self.assertFalse(trainer._distributed) 
         self.assertIsNone(trainer.device)
