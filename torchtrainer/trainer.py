@@ -60,7 +60,7 @@ class Trainer:
         if distributed and self.gpu_num < 2: 
             raise ValueError(f"cannot use distributed training, only {self.gpu_num} gpu are present")
 
-        if distributed and self.dataloader.sampler is not None:
+        if distributed and (self.dataloader.train_sampler is not None or self.dataloader.valid_sampler is not None):
             raise ValueError(f"Cannot use custom sampler with distributed training")
 
         # set true only if distributed is enable and device is not set to any particular one
@@ -200,8 +200,8 @@ class Trainer:
                                                                    device)
 
         else: 
-            train_loader = self.dataloader._get_loader(self.train_dataset, device)
-            valid_loader = self.dataloader._get_loader(self.valid_dataset, device)
+            train_loader = self.dataloader._get_loader(self.train_dataset, device, 'train')
+            valid_loader = self.dataloader._get_loader(self.valid_dataset, device, 'valid')
 
         # num of train batches
         train_batch_num = len(train_loader) - 1
