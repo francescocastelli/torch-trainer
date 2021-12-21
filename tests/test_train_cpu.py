@@ -1,4 +1,5 @@
 import unittest
+from parameterized import parameterized
 import torch
 from torchtrainer.model import Model
 from torchtrainer.trainer import Trainer
@@ -98,21 +99,29 @@ class ValidDataset():
         return {'inputs': inputs, 'labels': labels}
 
 
-class ModelSetUpTestCase(unittest.TestCase):
+
+### Test case ###
+
+
+class TrainMNISTCpu(unittest.TestCase):
     def setUp(self):
         self.bs = 4
-        self.epochs = 3
         self.model = Net()
         self.train_dataset = TrainDataset()
         self.valid_dataset = ValidDataset()
 
-    def test_train_trainer(self):
+    @parameterized.expand([
+            [3],
+            [5],
+            [10],
+        ])
+    def test_train_trainer(self, epochs):
         args = {}
         loader = TrainerLoader(batch_size=self.bs, num_workers=0, shuffle=False)
 
         trainer = Trainer(model=self.model, train_dataset=self.train_dataset, 
                           valid_dataset=self.valid_dataset, summary_args=args,
-                          epoch_num=self.epochs, loader=loader, 
+                          epoch_num=epochs, loader=loader, 
                           distributed=False, print_stats=True, tb_logs=False)
 
         self.assertFalse(trainer._distributed) 
@@ -131,7 +140,7 @@ class ModelSetUpTestCase(unittest.TestCase):
 
         optimizer, _ = self.model.define_optimizer_scheduler()
 
-        for epoch in range(self.epochs):  # loop over the dataset multiple times
+        for epoch in range(epochs):  # loop over the dataset multiple times
             running_loss = 0.0
             for i, data in enumerate(trainloader, 0):
                 inputs = data['inputs']
@@ -152,8 +161,6 @@ class ModelSetUpTestCase(unittest.TestCase):
 
         final_loss = running_loss / (len(trainloader))
         self.assertAlmostEqual(trainer_train_loss, final_loss, delta=0.1)
-
-
 
 if __name__ == '__main__':
     unittest.main()
