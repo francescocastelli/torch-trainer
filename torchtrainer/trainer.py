@@ -243,7 +243,6 @@ class Trainer:
                     self._print_epoch_stats(model.train_stats, epoch, i, (i+1) * self.dataloader.bs, train_batch_num, valid_len, scheduler.get_last_lr()[0])
 
             # compute validation loss and acc at the end of each epoch
-            torch.cuda.empty_cache()
             model.eval()
             with torch.no_grad():
                 for i, data in enumerate(valid_loader):
