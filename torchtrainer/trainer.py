@@ -2,7 +2,6 @@ import os
 import torch
 import copy
 import random 
-import pandas as pd
 import json
 from torchtrainer.model import Model
 from torch.utils.tensorboard import SummaryWriter
@@ -17,7 +16,8 @@ class Trainer:
     def __init__(self, model: Model, train_dataset: torch.utils.data.Dataset, 
                  valid_dataset: torch.utils.data.Dataset, loader: TrainerLoader,
                  epoch_num: int, summary_args: dict, seed=0, device=None, 
-                 distributed=False, print_stats=True, save_path=None, tb_logs=False, 
+                 distributed=False, print_stats=True, results_path=None, 
+                 tb_logs=False, tb_checkpoint_rate=0, checkpoint_path=None,
                  tb_embeddings=False, tb_embeddings_num=None):
         """
         Parameters 
@@ -54,8 +54,14 @@ class Trainer:
         # tensorboard stuffs
         self.tb_embeddings = tb_embeddings
         self.tb_logs = tb_logs
-        self.save_path = save_path
+        self.save_path = results_path
         self.tb_embeddings_num = tb_embeddings_num
+        self.load_path = checkpoint_path
+        if tb_checkpoint_rate > 0:
+            self.save_checkpoint = True
+            self.checkpoint_rate = tb_checkpoint_rate
+        else: 
+            self.save_checkpoint = False
 
         if distributed and self.gpu_num < 2: 
             raise ValueError(f"cannot use distributed training, only {self.gpu_num} gpu are present")
@@ -67,13 +73,15 @@ class Trainer:
         # at this point we are also sure to have at least 2 gpus for training
         self._distributed = (distributed and (self.device is None))
 
-        if tb_logs and save_path is None: 
-            raise ValueError("save_path should be defined if tb_logs is True")
+        # tb checks
+        if tb_logs and self.save_path is None: 
+            raise ValueError("results_path should be defined if tb_logs is True")
         if tb_embeddings and tb_embeddings_num is None: 
             raise ValueError("tb_embeddings_num should be defined if tb_embeddings is True")
-        if self.model.load_path is not None:
-            self.model.load_state_dict(torch.load(os.path.join(os.getcwd(), self.model.load_path),
-                                                   map_location=device))
+
+        # checkpoint checks
+        if tb_logs and tb_checkpoint_rate <= 0: 
+            raise ValueError("tb_logs should be True if tb_checkpoint_rate is greater than 0")
 
         # set seeds
         torch.manual_seed(seed)
@@ -89,6 +97,17 @@ class Trainer:
 
     def _send_to_device(self, data: dict, device):
         data.update({k: d.to(device) for k, d in data.items()})
+
+    def _save_checkpoint(self, epoch, model, optimizer, train_loss, last=False):
+        name = self.model_name
+        name += f'.pt' if last else f'_ckpt_epoch_{epoch}.pt'
+        path = os.path.join(self.tb_logdir, 'checkpoints', name)
+
+        torch.save({
+            'epoch': epoch,
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'loss': train_loss}, path)
 
     ##  -- stats --
 
@@ -118,9 +137,9 @@ class Trainer:
         self.tb_writer.add_graph(model, torch.rand(input_shape))
         self.tb_writer.flush()
 
-    def _tb_save_results(self, train_len, valid_len, model):
-        # save model
-        torch.save(model.state_dict(), os.path.join(self.tb_logdir, self.model_name + '.pt'))
+    def _tb_save_results(self, train_len, valid_len, model, epoch, optimizer, train_loss):
+        self._save_checkpoint(epoch, model, optimizer, train_loss, last=True)
+
         # write hparameters to tensorboard
         # this can be useful to compare different runs with different hparams
         hpar_dict = {'hparam/{}'.format(k): v / train_len for k, v in model.train_stats.items()}
@@ -214,8 +233,19 @@ class Trainer:
             #input_sample = next(iter(train_loader))
             #self._tb_save_graph(model, input_sample.shape)
 
+        # load checkpoint
+        epoch_start = 0
+        if self.load_path:
+            ckpt_dict = torch.load(self.load_path, map_location=device)
+
+            model.load_state_dict(ckpt_dict['model_state_dict'])
+            if 'optimizer_state_dict' in ckpt_dict:
+                optimizer.load_state_dict(ckpt_dict['optimizer_state_dict'])
+            if 'epoch' in ckpt_dict:
+                epoch_start = ckpt_dict['epoch'] + 1
+
         # training loop
-        for epoch in range(self.epoch_num): 
+        for epoch in range(epoch_start, self.epoch_num): 
             model.reset_stats()
             model.train()
 
@@ -264,12 +294,17 @@ class Trainer:
                 self._save_epoch_stats(epoch, train_len=len(train_loader.dataset), valid_len=len(valid_loader.dataset),
                                        train_stats=model.train_stats, valid_stats=model.valid_stats)
 
+            # save checkpoint 
+            if master and self.save_checkpoint and (epoch % self.checkpoint_rate):
+                self._save_checkpoint(epoch, model, optimizer, loss)
+
         # train end
         helper.print_end_train() 
     
         # tensorboard for saving results and embeddings
         if master and self.tb_logs:
-            self._tb_save_results(model=model, train_len=len(train_loader.dataset), valid_len=len(valid_loader.dataset))
+            self._tb_save_results(model=model, train_len=len(train_loader.dataset), valid_len=len(valid_loader.dataset),
+                                  epoch=epoch, optimizer=optimizer, train_loss=loss)
 
         if master and self.tb_embeddings:
             self._tb_save_embeddings(model, device, valid_loader)

@@ -10,11 +10,14 @@ def get_free_gpu():
 
 def create_logs_dir(dir_path, model_name):
     dir_name = datetime.now().strftime('%d-%m-%y_%H:%M:%S')
-    dir_path = os.path.join(dir_path, model_name, dir_name)
+    # expand tilde in case is present
+    path_to_folder = os.path.expanduser(dir_path)
+    dir_path = os.path.join(path_to_folder, model_name, dir_name)
 
     #create the directory 
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
+        os.mkdir(os.path.join(dir_path, 'checkpoints'))
 
     return dir_path 
 
