@@ -22,12 +22,11 @@ class Model(torch.nn.Module):
         the save_epoch_stats
     '''
 
-    def __init__(self, name, load_path=None):
+    def __init__(self, name):
         super().__init__()
         # will be set by the Trainer
         self._device = None
         self.name = name
-        self.load_path = load_path
         
     def _train_step_unimplemented(self, *input: Any):
         raise NotImplementedError
