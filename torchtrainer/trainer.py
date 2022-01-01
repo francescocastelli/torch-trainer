@@ -15,20 +15,64 @@ import torchtrainer.utils._distribute as dist
 class Trainer:
     def __init__(self, model: Model, train_dataset: torch.utils.data.Dataset, 
                  valid_dataset: torch.utils.data.Dataset, loader: TrainerLoader,
-                 epoch_num: int, summary_args: dict, seed=0, device=None, 
-                 distributed=False, print_stats=True, results_path=None, 
-                 tb_logs=False, tb_checkpoint_rate=0, checkpoint_path=None,
-                 tb_embeddings=False, tb_embeddings_num=None):
+                 epoch_num: int, summary_args: dict, seed: int=0, device=None, 
+                 distributed: bool=False, verbose: bool=True, results_path: str=None, 
+                 tb_logs: bool=False, tb_checkpoint_rate: int=0, checkpoint_path: str=None,
+                 tb_embeddings_num: int=0):
         """
         Parameters 
         __________
 
-        summary_args : dict, required
-            Is used for printing the summary before training
-        tb_logs : bool, default=False
-            Specify if you want to save tensorboard logs 
-        tb_embeddings : bool, default=False
-            Specify if you want to save embeddings for tensorboard projections     
+        model (torchtrainer.model.Model): instance of torchtrainer Model, the actual model 
+                                          that contains the training step and so on
+
+        train_dataset (torch.utils.data.Dataset): dataset for training
+
+        valid_dataset (torch.utils.data.Dataset): dataset for validation 
+
+        loader (torchtrainer.dataloader.TrainerLoader): TrainerLoader which contains all the info
+                                                        about data loading (both train and validation)
+
+        epoch_num (int): number of epochs for training
+
+        seed (int): seed used for torch and random. default=0
+
+        device: device on which perform training, eg: cpu, cuda:0, cuda:1, ...
+                If set to None and gpus are detected on the machine, the one with the lower memory usage
+                will be choosen (otherwise cpu is used). default=None
+
+        distributed (bool): allow distributed training on multiple gpus, using the distributed module of pytorch 
+                            on a single node. default=False
+
+        verbose (bool): print info on console at every step. If False prints only at the end of each epoch. 
+                        default=True
+                 
+        results_path (str): absolute path to the folder in which tensorboard logs, model, checkpoint, ecc... will
+                            be stored. default=None
+
+        tb_logs (bool): If true tensorboard will be used to store statistics at each epoch, and the final model 
+                        at the end of the training. The path for the tb logs will be something like this: 
+                           - results_path/model_name/dd_mm_aa_hh:mm:ss/
+
+                        At the end of the training you will find inside all the info for tensorboard and the final
+                        model state dict (model_name.pt). If tb_checkpoint_rate is greater than 0, also a folder with
+                        checkpoints will be created.
+
+                        default=False
+
+        tb_checkpoint_rate (int): The number of epochs at which checkpoint are stored, eg: 2 -> every two epochs, 
+                                  3 -> every three epochs, ... . default=0
+
+        checkpoint_path (str): absolute path to the checkpoint file that you want to load before training. This can
+                               be used to start the training from a previous computed checkpoint. 
+                               We expect a dictionary with these keys:  
+
+                               - 'model_state_dict': dict, required
+                               - 'epoch': int, optional 
+                               - 'optimizer_state_dict': dict, optional
+                               - 'loss': train_loss, optional
+
+                               default=None
 
         """
         # model info
@@ -50,12 +94,12 @@ class Trainer:
         self.model.init_stats()
         # args 
         self.args = summary_args
-        self.print_stats = print_stats
+        self.print_stats = verbose 
         # tensorboard stuffs
-        self.tb_embeddings = tb_embeddings
         self.tb_logs = tb_logs
         self.save_path = results_path
         self.tb_embeddings_num = tb_embeddings_num
+        self.tb_embeddings = self.tb_embeddings_num > 0
         self.load_path = checkpoint_path
         if tb_checkpoint_rate > 0:
             self.save_checkpoint = True
@@ -76,11 +120,11 @@ class Trainer:
         # tb checks
         if tb_logs and self.save_path is None: 
             raise ValueError("results_path should be defined if tb_logs is True")
-        if tb_embeddings and tb_embeddings_num is None: 
-            raise ValueError("tb_embeddings_num should be defined if tb_embeddings is True")
+        if self.tb_embeddings and not tb_logs: 
+            raise ValueError("tb_logs should be True if tb_embeddings_num is greater than 0")
 
         # checkpoint checks
-        if tb_logs and tb_checkpoint_rate <= 0: 
+        if tb_checkpoint_rate > 0 and not tb_logs: 
             raise ValueError("tb_logs should be True if tb_checkpoint_rate is greater than 0")
 
         # set seeds
