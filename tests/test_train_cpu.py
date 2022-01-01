@@ -8,7 +8,7 @@ import torchvision
 import torchvision.transforms as transforms
 import torch.optim as optim
 
-class Net(Model):
+class Net(Model): 
     def __init__(self):
         super().__init__(name='test')
         self.conv1 = torch.nn.Conv2d(3, 6, 5)
@@ -38,7 +38,7 @@ class Net(Model):
         outputs = self(inputs)
         loss = self.criterion(outputs, labels)
 
-        self.save_train_stats(train_loss=loss.item()*inputs.shape[0], test=0.0)
+        self.save_train_stats(train_loss=loss.item(), test=0.0)
 
         return loss
 
@@ -50,7 +50,7 @@ class Net(Model):
         outputs = self(inputs)
         loss = self.criterion(outputs, labels)
 
-        self.save_valid_stats(valid_loss=loss.item()*inputs.shape[0], v_test=0.0)
+        self.save_valid_stats(valid_loss=loss.item(), v_test=0.0)
 
         return loss
 
@@ -130,7 +130,7 @@ class TrainMNISTCpu(unittest.TestCase):
         # train first with the trainer and save the loss
         trainer.train()
 
-        trainer_train_loss = self.model.train_stats['train_loss'].item() / len(self.train_dataset)
+        trainer_train_loss = self.model.train_stats['train_loss'].item() / (len(self.train_dataset) / self.bs)
 
         # reset the model and train like in https://pytorch.org/tutorials/beginner/blitz/cifar10_tutorial.html
         self.model = Net()

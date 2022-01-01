@@ -118,14 +118,14 @@ class Trainer:
         for key, value in valid_stats.items():
             self.tb_writer.add_scalar('Valid/{}'.format(key), value / valid_len, epoch)
 
-    def _print_epoch_stats(self, train_stats, current_epoch, i, train_len, num_train_batches, valid_len, last_lr, end=False, valid_stats=None):
-        out_dict = {k: v.item() / train_len for k, v in train_stats.items()}
+    def _print_epoch_stats(self, cur_step, cur_epoch, cur_lr, train_len, valid_len, train_stats, valid_stats=None):
+        out_dict = {k: v.item() / cur_step for k, v in train_stats.items()}
 
-        if end:
-            out_dict.update({k: v.item() / (valid_len) for k, v in valid_stats.items()})
+        if valid_stats:
+            out_dict.update({k: v.item() / valid_len for k, v in valid_stats.items()})
 
-        helper.print_epoch_stats(current_epoch, i, num_train_batches, last_lr, 
-                                 end, **out_dict)
+        end = valid_stats is not None
+        helper.print_epoch_stats(cur_step, cur_epoch, train_len, cur_lr, end, **out_dict)
 
     ## -- tensorboard stuffs --
 
@@ -223,9 +223,9 @@ class Trainer:
             valid_loader = self.dataloader._get_loader(self.valid_dataset, device, 'valid')
 
         # num of train batches
-        train_batch_num = len(train_loader) - 1
-        # num of samples in the train dataset
-        valid_len = len(valid_loader.dataset)
+        train_len = len(train_loader)
+        # num of valid batches 
+        valid_len = len(valid_loader)
 
         if self.tb_logs and master:
             self._tb_setup_tensorboard()
@@ -270,12 +270,12 @@ class Trainer:
 
                 # (print_stats && (!distributed or device == gpu:0))
                 if self.print_stats and master:
-                    self._print_epoch_stats(model.train_stats, epoch, i, (i+1) * self.dataloader.bs, train_batch_num, valid_len, scheduler.get_last_lr()[0])
+                    self._print_epoch_stats(i+1, epoch, scheduler.get_last_lr()[0], train_len, valid_len, model.train_stats)
 
             # compute validation loss and acc at the end of each epoch
             model.eval()
             with torch.no_grad():
-                for i, data in enumerate(valid_loader):
+                for _, data in enumerate(valid_loader):
                     # send to device
                     self._send_to_device(data, device)
 
@@ -283,8 +283,7 @@ class Trainer:
                     model.validation_step(data)
 
             if (not self._distributed) or device.index == 0:
-                self._print_epoch_stats(model.train_stats, epoch, train_batch_num, len(train_loader.dataset), train_batch_num, valid_len, 
-                                        scheduler.get_last_lr()[0], end=True, valid_stats=model.valid_stats)
+                self._print_epoch_stats(i+1, epoch, scheduler.get_last_lr()[0], train_len, valid_len, model.train_stats, model.valid_stats)
 
             #lr decay step
             if scheduler is not None: 

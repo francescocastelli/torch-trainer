@@ -69,10 +69,10 @@ def print_overall_summary(model, train_config):
 
     print('\r{}\n'.format(out))
 
-def print_epoch_stats(epoch, current_i, data_size, lr, end=False, **kwargs): 
-    out = '  Epoch {}:\n'.format(epoch)
+def print_epoch_stats(cur_i, cur_epoch, tot_len, lr, end=False, **kwargs): 
+    out = '  Epoch {}:\n'.format(cur_epoch)
     out += '{} lr={:3e}\n'.format(10*' ', lr)
-    out += '{} {}/{}'.format(10*' ', current_i, data_size)
+    out += '{} {}/{}'.format(10*' ', cur_i, tot_len)
     line_num = 0
     mod_num = 3 if not len(kwargs) % 3 else 2
 
