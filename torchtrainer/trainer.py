@@ -142,7 +142,7 @@ class Trainer:
     def _send_to_device(self, data: dict, device):
         data.update({k: d.to(device) for k, d in data.items()})
 
-    def _save_checkpoint(self, epoch, model, optimizer, train_loss, last=False):
+    def _save_checkpoint(self, epoch, model, optimizer, scheduler, train_loss, last=False):
         name = self.model_name
         name += f'.pt' if last else f'_ckpt_epoch_{epoch}.pt'
         path = os.path.join(self.tb_logdir, 'checkpoints', name)
@@ -151,6 +151,7 @@ class Trainer:
             'epoch': epoch,
             'model_state_dict': model.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
+            'scheduler_state_dict': scheduler.state_dict(),
             'loss': train_loss}, path)
 
     ##  -- stats --
@@ -181,8 +182,8 @@ class Trainer:
         self.tb_writer.add_graph(model, torch.rand(input_shape))
         self.tb_writer.flush()
 
-    def _tb_save_results(self, train_len, valid_len, model, epoch, optimizer, train_loss):
-        self._save_checkpoint(epoch, model, optimizer, train_loss, last=True)
+    def _tb_save_results(self, train_len, valid_len, model, epoch, optimizer, scheduler, train_loss):
+        self._save_checkpoint(epoch, model, optimizer, scheduler, train_loss, last=True)
 
         # write hparameters to tensorboard
         # this can be useful to compare different runs with different hparams
@@ -285,6 +286,8 @@ class Trainer:
             model.load_state_dict(ckpt_dict['model_state_dict'])
             if 'optimizer_state_dict' in ckpt_dict:
                 optimizer.load_state_dict(ckpt_dict['optimizer_state_dict'])
+            if 'scheduler_state_dict' in ckpt_dict:
+                scheduler.load_state_dict(ckpt_dict['scheduler_state_dict'])
             if 'epoch' in ckpt_dict:
                 epoch_start = ckpt_dict['epoch'] + 1
 
@@ -339,7 +342,7 @@ class Trainer:
 
             # save checkpoint 
             if master and self.save_checkpoint and (epoch % self.checkpoint_rate):
-                self._save_checkpoint(epoch, model, optimizer, loss)
+                self._save_checkpoint(epoch, model, optimizer, scheduler, loss)
 
         # train end
         helper.print_end_train() 
@@ -347,7 +350,7 @@ class Trainer:
         # tensorboard for saving results and embeddings
         if master and self.tb_logs:
             self._tb_save_results(model=model, train_len=len(train_loader.dataset), valid_len=len(valid_loader.dataset),
-                                  epoch=epoch, optimizer=optimizer, train_loss=loss)
+                                  epoch=epoch, optimizer=optimizer, scheduler=scheduler, train_loss=loss)
 
         if master and self.tb_embeddings:
             self._tb_save_embeddings(model, device, valid_loader)

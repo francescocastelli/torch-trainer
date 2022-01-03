@@ -60,7 +60,7 @@ class Net(Model):
     def define_optimizer_scheduler(self):
         opt = optim.SGD(self.parameters(), lr=0.001, momentum=0.9)
         scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=opt,
-                                                           gamma=1.0, last_epoch=-1)
+                                                           gamma=0.8, last_epoch=-1)
         return (opt, scheduler)
 
     def embeddings_forward(self):
@@ -120,7 +120,7 @@ class TrainMNISTCpu(unittest.TestCase):
         trainer = Trainer(model=model, train_dataset=self.train_dataset, 
                           valid_dataset=self.valid_dataset, summary_args=args,
                           epoch_num=epochs, loader=loader, 
-                          distributed=False, print_stats=True, tb_logs=True, 
+                          distributed=False, verbose=True, tb_logs=True, 
                           results_path=self.tmp_dir, tb_checkpoint_rate=2)
 
         self.assertFalse(trainer._distributed) 
@@ -141,7 +141,7 @@ class TrainMNISTCpu(unittest.TestCase):
         trainer = Trainer(model=model, train_dataset=self.train_dataset, 
                           valid_dataset=self.valid_dataset, summary_args=args,
                           epoch_num=epochs, loader=loader, 
-                          distributed=False, print_stats=True, tb_logs=False,
+                          distributed=False, verbose=True, tb_logs=False,
                           checkpoint_path=ckpt_path)
 
         trainer.train()
