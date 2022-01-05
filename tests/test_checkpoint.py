@@ -146,8 +146,9 @@ class TrainMNISTCpu(unittest.TestCase):
 
         trainer.train()
 
-    def cleanUp(self):
-        shutil.rmtree(self.tmp_dir)
+    def tearDown(self):
+        #shutil.rmtree(self.tmp_dir)
+        pass
 
 if __name__ == '__main__':
     unittest.main()

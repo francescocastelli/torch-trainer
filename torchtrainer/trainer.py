@@ -341,7 +341,7 @@ class Trainer:
                                        train_stats=model.train_stats, valid_stats=model.valid_stats)
 
             # save checkpoint 
-            if master and self.save_checkpoint and (epoch % self.checkpoint_rate):
+            if master and self.save_checkpoint and (epoch > 0) and not (epoch % self.checkpoint_rate):
                 self._save_checkpoint(epoch, model, optimizer, scheduler, loss)
 
         # train end
