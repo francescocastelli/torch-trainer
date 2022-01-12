@@ -349,7 +349,7 @@ class Trainer:
     
         # tensorboard for saving results and embeddings
         if master and self.tb_logs:
-            self._tb_save_results(model=model, train_len=train_len, valid_len=valide_len,
+            self._tb_save_results(model=model, train_len=train_len, valid_len=valid_len,
                                   epoch=epoch, optimizer=optimizer, scheduler=scheduler, train_loss=loss)
 
         if master and self.tb_embeddings:
