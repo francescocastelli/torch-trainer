@@ -1,7 +1,8 @@
 import os 
 import torch
 import copy
-import random import json
+import random 
+import json
 from torchtrainer.model import Model
 from torch.utils.tensorboard import SummaryWriter
 from torchtrainer.utils import _trainer_helper as helper
