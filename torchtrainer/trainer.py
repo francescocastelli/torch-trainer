@@ -1,8 +1,7 @@
 import os 
 import torch
 import copy
-import random 
-import json
+import random import json
 from torchtrainer.model import Model
 from torch.utils.tensorboard import SummaryWriter
 from torchtrainer.utils import _trainer_helper as helper
@@ -337,7 +336,7 @@ class Trainer:
                 scheduler.step()
             
             if master and self.tb_logs:
-                self._save_epoch_stats(epoch, train_len=len(train_loader.dataset), valid_len=len(valid_loader.dataset),
+                self._save_epoch_stats(epoch, train_len=train_len, valid_len=valid_len,
                                        train_stats=model.train_stats, valid_stats=model.valid_stats)
 
             # save checkpoint 
@@ -349,7 +348,7 @@ class Trainer:
     
         # tensorboard for saving results and embeddings
         if master and self.tb_logs:
-            self._tb_save_results(model=model, train_len=len(train_loader.dataset), valid_len=len(valid_loader.dataset),
+            self._tb_save_results(model=model, train_len=train_len, valid_len=valide_len,
                                   epoch=epoch, optimizer=optimizer, scheduler=scheduler, train_loss=loss)
 
         if master and self.tb_embeddings:
