@@ -156,12 +156,14 @@ class Trainer:
 
     ##  -- stats --
 
-    def _save_epoch_stats(self, epoch, train_len, valid_len, train_stats, valid_stats):
+    def _save_epoch_stats(self, epoch, train_len, valid_len, train_stats, valid_stats, last_lr):
         for key, value in train_stats.items():
             self.tb_writer.add_scalar('Train/{}'.format(key), value / train_len, epoch)
 
         for key, value in valid_stats.items():
             self.tb_writer.add_scalar('Valid/{}'.format(key), value / valid_len, epoch)
+
+        self.tb_writer.add_scalar(f'Learning rate', last_lr, epoch)
 
     def _print_epoch_stats(self, cur_step, cur_epoch, cur_lr, train_len, valid_len, train_stats, valid_stats=None):
         out_dict = {k: v.item() / cur_step for k, v in train_stats.items()}
@@ -338,7 +340,8 @@ class Trainer:
             
             if master and self.tb_logs:
                 self._save_epoch_stats(epoch, train_len=train_len, valid_len=valid_len,
-                                       train_stats=model.train_stats, valid_stats=model.valid_stats)
+                                       train_stats=model.train_stats, valid_stats=model.valid_stats, 
+                                       last_lr=scheduler.get_last_lr()[0])
 
             # save checkpoint 
             if master and self.save_checkpoint and (epoch > 0) and not (epoch % self.checkpoint_rate):
