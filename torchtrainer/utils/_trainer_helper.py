@@ -69,21 +69,12 @@ def print_overall_summary(model, train_config):
 
     print('\r{}\n'.format(out))
 
-def print_epoch_stats(cur_i, cur_epoch, tot_len, lr, end=False, **kwargs): 
-    out = '  Epoch {}:\n'.format(cur_epoch)
-    out += '{} lr={:3e}\n'.format(10*' ', lr)
-    out += '{} {}/{}'.format(10*' ', cur_i, tot_len)
-    line_num = 0
-    mod_num = 3 if not len(kwargs) % 3 else 2
+def print_epoch_stats(pbar, **kwargs): 
+    msg = f"lr:{kwargs.pop('lr')}"
+    for key, value in kwargs.items():
+        msg += f" - {key}:{value:.4f}"
 
-    for i, (key, value) in enumerate(kwargs.items()):
-        out += ' - {}={:.4f}'.format(key, value) 
-        if not (i+1) % mod_num: 
-            out += '\n{}'.format(18*' ')
-            line_num +=1
-
-    print('\033[{}F{}'.format(2+line_num, out), end='')
-    if end: print('\n'*3)
+    pbar.set_postfix_str(msg)
 
 def print_end_train():
     width = os.get_terminal_size().columns

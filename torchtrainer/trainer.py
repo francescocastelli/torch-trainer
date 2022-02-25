@@ -3,6 +3,7 @@ import torch
 import copy
 import random 
 import json
+from tqdm import tqdm
 from torchtrainer.model import Model
 from torch.utils.tensorboard import SummaryWriter
 from torchtrainer.utils import _trainer_helper as helper
@@ -165,14 +166,14 @@ class Trainer:
 
         self.tb_writer.add_scalar(f'Learning rate', last_lr, epoch)
 
-    def _print_epoch_stats(self, cur_step, cur_epoch, cur_lr, train_len, valid_len, train_stats, valid_stats=None):
+    def _print_epoch_stats(self, pbar, cur_step, cur_lr, train_len, valid_len, train_stats, valid_stats=None):
         out_dict = {k: v.item() / cur_step for k, v in train_stats.items()}
+        out_dict['lr'] = cur_lr
 
         if valid_stats:
             out_dict.update({k: v.item() / valid_len for k, v in valid_stats.items()})
 
-        end = valid_stats is not None
-        helper.print_epoch_stats(cur_step, cur_epoch, train_len, cur_lr, end, **out_dict)
+        helper.print_epoch_stats(pbar, **out_dict)
 
     ## -- tensorboard stuffs --
 
@@ -303,7 +304,10 @@ class Trainer:
                 train_sampler.set_epoch(epoch)
                 valid_sampler.set_epoch(epoch)
 
-            for i, data in enumerate(train_loader):
+            print(f"Epoch {epoch}/{self.epoch_num}")
+            pbar = tqdm(train_loader, bar_format='  {n_fmt}/{total_fmt} |{bar:20}| {elapsed}<{remaining} {postfix}',
+                        unit_scale=True)
+            for i, data in enumerate(pbar):
                 # send to device
                 self._send_to_device(data, device)
 
@@ -319,7 +323,7 @@ class Trainer:
 
                 # (print_stats && (!distributed or device == gpu:0))
                 if self.print_stats and master:
-                    self._print_epoch_stats(i+1, epoch, scheduler.get_last_lr()[0], train_len, valid_len, model.train_stats)
+                    self._print_epoch_stats(pbar, i+1, scheduler.get_last_lr()[0], train_len, valid_len, model.train_stats)
 
             # compute validation loss and acc at the end of each epoch
             model.eval()
@@ -332,7 +336,7 @@ class Trainer:
                     model.validation_step(data)
 
             if (not self._distributed) or device.index == 0:
-                self._print_epoch_stats(i+1, epoch, scheduler.get_last_lr()[0], train_len, valid_len, model.train_stats, model.valid_stats)
+                self._print_epoch_stats(pbar, i+1, scheduler.get_last_lr()[0], train_len, valid_len, model.train_stats, model.valid_stats)
 
             #lr decay step
             if scheduler is not None: 
