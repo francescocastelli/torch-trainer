@@ -318,7 +318,7 @@ class Trainer:
                 self._send_to_device(data, device)
 
                 # zero the parameter gradients
-                optimizer.zero_grad()
+                optimizer.zero_grad(set_to_none=True)
 
                 # training step 
                 loss = model.training_step(data)
