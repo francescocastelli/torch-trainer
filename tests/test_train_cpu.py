@@ -122,7 +122,7 @@ class TrainMNISTCpu(unittest.TestCase):
         trainer = Trainer(model=self.model, train_dataset=self.train_dataset, 
                           valid_dataset=self.valid_dataset, summary_args=args,
                           epoch_num=epochs, loader=loader, 
-                          distributed=False, print_stats=True, tb_logs=False)
+                          distributed=False, verbose=True, tb_logs=False)
 
         self.assertFalse(trainer._distributed) 
         self.assertIsNone(trainer.device)
