@@ -173,7 +173,8 @@ class Trainer:
         if valid_stats:
             out_dict.update({k: v.item() / valid_len for k, v in valid_stats.items()})
 
-        helper.print_epoch_stats(pbar, **out_dict)
+        end = valid_stats is not None
+        helper.print_epoch_stats(pbar, end, **out_dict)
 
     ## -- tensorboard stuffs --
 
@@ -304,10 +305,15 @@ class Trainer:
                 train_sampler.set_epoch(epoch)
                 valid_sampler.set_epoch(epoch)
 
-            print(f"Epoch {epoch}/{self.epoch_num}")
-            pbar = tqdm(train_loader, bar_format='  {n_fmt}/{total_fmt} |{bar:20}| {elapsed}<{remaining} {postfix}',
-                        unit_scale=True)
-            for i, data in enumerate(pbar):
+            # if verbose use tqdm to print status bar
+            if self.print_stats and master:
+                print(f"Epoch {epoch}/{self.epoch_num}")
+                loader = tqdm(train_loader, bar_format='  {n_fmt}/{total_fmt} |{bar:20}| {elapsed} {postfix}',
+                              unit_scale=True, leave=True)
+            else: 
+                loader = train_loader
+
+            for i, data in enumerate(loader):
                 # send to device
                 self._send_to_device(data, device)
 
@@ -323,7 +329,7 @@ class Trainer:
 
                 # (print_stats && (!distributed or device == gpu:0))
                 if self.print_stats and master:
-                    self._print_epoch_stats(pbar, i+1, scheduler.get_last_lr()[0], train_len, valid_len, model.train_stats)
+                    self._print_epoch_stats(loader, i+1, scheduler.get_last_lr()[0], train_len, valid_len, model.train_stats)
 
             # compute validation loss and acc at the end of each epoch
             model.eval()
@@ -335,8 +341,9 @@ class Trainer:
                     # valid step 
                     model.validation_step(data)
 
-            if (not self._distributed) or device.index == 0:
-                self._print_epoch_stats(pbar, i+1, scheduler.get_last_lr()[0], train_len, valid_len, model.train_stats, model.valid_stats)
+            if self.print_stats and master:
+                self._print_epoch_stats(loader, i+1, scheduler.get_last_lr()[0], train_len, valid_len, model.train_stats, model.valid_stats)
+                loader.close()
 
             #lr decay step
             if scheduler is not None: 

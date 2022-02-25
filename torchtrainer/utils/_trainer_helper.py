@@ -1,6 +1,6 @@
 import os 
-import torch
 import numpy as np
+from tqdm import tqdm
 from datetime import datetime
 
 def get_free_gpu():
@@ -69,12 +69,18 @@ def print_overall_summary(model, train_config):
 
     print('\r{}\n'.format(out))
 
-def print_epoch_stats(pbar, **kwargs): 
-    msg = f"lr:{kwargs.pop('lr')}"
+def print_epoch_stats(pbar, end, **kwargs): 
+    msg = f"lr:{kwargs.pop('lr'):.2e}"
     for key, value in kwargs.items():
         msg += f" - {key}:{value:.4f}"
 
     pbar.set_postfix_str(msg)
+
+    if end:
+       pbar.unpause()
+       bar = tqdm.format_meter(**pbar.format_dict)
+       pbar.display(bar, pos=-1)
+    
 
 def print_end_train():
     width = os.get_terminal_size().columns
