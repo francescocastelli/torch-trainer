@@ -41,18 +41,24 @@ class Model(torch.nn.Module):
         raise NotImplementedError
 
     def save_train_stats(self, **kwargs):
-        self.train_stats.update({k: self.train_stats[k] + d for k, d in kwargs.items()})
+        self._train_stats.update({k: self._train_stats[k] + d for k, d in kwargs.items()})
 
     def save_valid_stats(self, **kwargs):
-        self.valid_stats.update({k: self.valid_stats[k] + d for k, d in kwargs.items()})
+        self._valid_stats.update({k: self._valid_stats[k] + d for k, d in kwargs.items()})
 
     def init_stats(self):
-        self.train_stats = _default_stats(self._device)
-        self.valid_stats = _default_stats(self._device) 
+        self._train_stats = _default_stats(self._device)
+        self._valid_stats = _default_stats(self._device) 
 
     def reset_stats(self):
-        self.train_stats.clear()
-        self.valid_stats.clear()
+        self._train_stats.clear()
+        self._valid_stats.clear()
+
+    def train_stats(self):
+        return self._train_stats
+
+    def valid_stats(self):
+        return self._valid_stats
         
     '''
         These methods should be overrided by the user model class, otherwise throw 

@@ -111,9 +111,6 @@ class Trainer:
         if distributed and self.gpu_num < 2: 
             raise ValueError(f"cannot use distributed training, only {self.gpu_num} gpu are present")
 
-        if distributed and (self.dataloader.train_sampler is not None or self.dataloader.valid_sampler is not None):
-            raise ValueError(f"Cannot use custom sampler with distributed training")
-
         # set true only if distributed is enable and device is not set to any particular one
         # at this point we are also sure to have at least 2 gpus for training
         self._distributed = (distributed and (self.device is None))
@@ -191,8 +188,8 @@ class Trainer:
 
         # write hparameters to tensorboard
         # this can be useful to compare different runs with different hparams
-        hpar_dict = {'hparam/{}'.format(k): v / train_len for k, v in model.train_stats.items()}
-        hpar_dict.update({'hparam/{}'.format(k): v / valid_len for k, v in model.valid_stats.items()})
+        hpar_dict = {'hparam/{}'.format(k): v / train_len for k, v in model.train_stats().items()}
+        hpar_dict.update({'hparam/{}'.format(k): v / valid_len for k, v in model.valid_stats().items()})
 
         self.tb_writer.add_hparams(self.args, hpar_dict)
         self.tb_writer.flush()
@@ -262,10 +259,12 @@ class Trainer:
 
             train_loader, train_sampler = self.dataloader._get_distributed_loader(self.train_dataset, 
                                                                    world_size, gpu, 
-                                                                   device)
+                                                                   device, 
+                                                                   mode='train')
             valid_loader, valid_sampler = self.dataloader._get_distributed_loader(self.valid_dataset, 
                                                                    world_size, gpu,
-                                                                   device)
+                                                                   device, 
+                                                                   mode='valid')
 
         else: 
             train_loader = self.dataloader._get_loader(self.train_dataset, device, 'train')
@@ -329,7 +328,7 @@ class Trainer:
 
                 # (print_stats && (!distributed or device == gpu:0))
                 if self.print_stats and master:
-                    self._print_epoch_stats(loader, i+1, scheduler.get_last_lr()[0], train_len, valid_len, model.train_stats)
+                    self._print_epoch_stats(loader, i+1, scheduler.get_last_lr()[0], train_len, valid_len, model.train_stats())
 
             # compute validation loss and acc at the end of each epoch
             model.eval()
@@ -342,7 +341,7 @@ class Trainer:
                     model.validation_step(data)
 
             if self.print_stats and master:
-                self._print_epoch_stats(loader, i+1, scheduler.get_last_lr()[0], train_len, valid_len, model.train_stats, model.valid_stats)
+                self._print_epoch_stats(loader, i+1, scheduler.get_last_lr()[0], train_len, valid_len, model.train_stats(), model.valid_stats())
                 loader.close()
 
             #lr decay step
@@ -351,7 +350,7 @@ class Trainer:
             
             if master and self.tb_logs:
                 self._save_epoch_stats(epoch, train_len=train_len, valid_len=valid_len,
-                                       train_stats=model.train_stats, valid_stats=model.valid_stats, 
+                                       train_stats=model.train_stats(), valid_stats=model.valid_stats(), 
                                        last_lr=scheduler.get_last_lr()[0])
 
             # save checkpoint 

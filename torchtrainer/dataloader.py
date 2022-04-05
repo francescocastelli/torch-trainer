@@ -1,5 +1,6 @@
 import torch
 import random 
+from torchtrainer.utils._distribute import DistributedSamplerWrapper, DatasetFromSampler
 
 class TrainerLoader():
     """ TrainerLoader:
@@ -19,8 +20,8 @@ class TrainerLoader():
         self.valid_sampler = valid_sampler 
         self.collate_fn = collate_fn
         self.worker_init = worker_init
-        self.g = torch.Generator()
-        self.g.manual_seed(0)
+        #self.g = torch.Generator()
+        #self.g.manual_seed(0)
 
     def _worker_init_fn(self, w_id):
         worker_seed = torch.initial_seed() % 2**32
@@ -37,33 +38,43 @@ class TrainerLoader():
                                              num_workers=self.workers, 
                                              collate_fn=self.collate_fn, 
                                              pin_memory=pin_mem, 
-                                             worker_init_fn=self._worker_init_fn, 
-                                             generator=self.g)
+                                             worker_init_fn=self._worker_init_fn)
+                                             #generator=self.g)
 
         return loader
 
     def _get_default_sampler(self, dataset):
         if self.shuffle:
             return torch.utils.data.RandomSampler(dataset, 
-                                                  replacement=False, 
-                                                  generator=self.g)
+                                                  replacement=False)
+                                                  #generator=self.g)
 
         return torch.utils.data.SequentialSampler(dataset)
 
-    def _get_distributed_loader(self, dataset, world_size, rank, device):
-        # set up distributed sampler
-        sampler = torch.utils.data.distributed.DistributedSampler(
-                             dataset,
-                             num_replicas=world_size,
-                             rank=rank, 
-                             shuffle=self.shuffle)
+    def _get_distributed_loader(self, dataset, world_size, rank, device, mode):
+        assert mode == 'train' or mode == 'valid', "mode should either be train or valid"
+        default = self.train_sampler == None if mode == 'train' else self.valid_sampler == None
+
+        if default:
+            # set up distributed sampler
+            dist_sampler = torch.utils.data.distributed.DistributedSampler(
+                                 dataset,
+                                 num_replicas=world_size,
+                                 rank=rank, 
+                                 shuffle=self.shuffle)
+        else:
+            sampler = self.train_sampler if mode == 'train' else self.valid_sampler
+            dist_sampler = DistributedSamplerWrapper(
+                               DatasetFromSampler(sampler),
+                               num_replicas=world_size,
+                               rank=rank, 
+                               shuffle=self.shuffle)
         
-        return self._create_loader(dataset, sampler, device), sampler
+        return self._create_loader(dataset, dist_sampler, device), dist_sampler
 
 
     def _get_loader(self, dataset, device, mode):
         assert mode == 'train' or mode == 'valid', "mode should either be train or valid"
-
         default = self.train_sampler == None if mode == 'train' else self.valid_sampler == None
 
         if default:
