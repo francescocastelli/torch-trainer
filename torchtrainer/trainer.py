@@ -235,7 +235,8 @@ class Trainer:
     # in the case of distributed training
     def _train_loop(self, gpu, world_size):
         device = torch.device(gpu)
-        
+        torch.cuda.set_device(gpu)
+
         # we need to use a deep copy of the model on each subprocess in case of distributed training
         if self._distributed: 
             model = copy.deepcopy(self.model)
@@ -249,8 +250,6 @@ class Trainer:
         # distributed=false -> master=True (only one device that is the master)
         # distributed=True  -> (multiple gpus, only cuda:0 is the master)
         master = ((not self._distributed) or device.index == 0)
-
-        optimizer, scheduler = model.define_optimizer_scheduler()
 
         if self._distributed:
             # setup of each process
@@ -274,6 +273,8 @@ class Trainer:
         train_len = len(train_loader)
         # num of valid batches 
         valid_len = len(valid_loader)
+
+        optimizer, scheduler = model.define_optimizer_scheduler()
 
         if self.tb_logs and master:
             self._tb_setup_tensorboard()
